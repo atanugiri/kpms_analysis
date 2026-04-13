@@ -230,7 +230,7 @@ def step_prepare(
     # TODO: Extend this dict with any additional options you want to seed
     #       into the generated config.yml.
     setup_kwargs: dict = {}
-    for key in ("bodyparts", "use_bodyparts", "skeleton"):
+    for key in ("bodyparts", "use_bodyparts", "skeleton", "anterior_bodyparts", "posterior_bodyparts", "fps"):
         if key in config:
             setup_kwargs[key] = config[key]
 
