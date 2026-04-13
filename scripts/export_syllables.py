@@ -255,13 +255,13 @@ def main() -> None:
 
     logger = _setup_logging(log_path)
     logger.info("Project path : %s", project_path)
-    logger.info("KPMS dir     : %s", kpms_project_dir)
+    logger.info("KPMS dir    : %s", kpms_project_dir)
 
     # ------------------------------------------------------------------
     # Resolve output directory
     # ------------------------------------------------------------------
     out_dir = Path(args.out_dir) if args.out_dir else results_dir / "syllable_timeseries"
-    logger.info("Output dir   : %s", out_dir)
+    logger.info("Output dir  : %s", out_dir)
 
     # ------------------------------------------------------------------
     # Find results.h5 files

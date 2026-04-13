@@ -464,11 +464,11 @@ def main() -> None:
     # ------------------------------------------------------------------
     logger = _setup_logging(log_path)
     logger.info("=" * 60)
-    logger.info("Project      : %s", project_path)
-    logger.info("Pose data    : %s", pose_data_dir)
-    logger.info("KPMS dir     : %s", kpms_project_dir)
-    logger.info("Results dir  : %s", results_dir)
-    logger.info("Steps        : %s", steps)
+    logger.info("Project     : %s", project_path)
+    logger.info("Pose data   : %s", pose_data_dir)
+    logger.info("KPMS dir    : %s", kpms_project_dir)
+    logger.info("Results dir : %s", results_dir)
+    logger.info("Steps       : %s", steps)
     logger.info("=" * 60)
 
     # ------------------------------------------------------------------
