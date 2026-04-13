@@ -170,6 +170,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "If omitted, keypoint-moseq generates a timestamp-based name."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=(
+            "Validate the external project and configuration but do not "
+            "execute prepare/fit/export steps (useful for CI and checks)."
+        ),
+    )
     return parser
 
 
@@ -504,6 +513,18 @@ def main() -> None:
     # Create output directories
     # ------------------------------------------------------------------
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Dry-run: validate configuration and paths without running heavy work
+    # ------------------------------------------------------------------
+    if getattr(args, "dry_run", False):
+        logger.info("Dry-run enabled: validation complete. No steps will be executed.")
+        logger.info("Requested steps: %s", steps)
+        logger.info("KPMS project dir: %s", kpms_project_dir)
+        logger.info("Pose data dir: %s", pose_data_dir)
+        logger.info("Results dir: %s", results_dir)
+        logger.info("Exiting due to --dry-run.")
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Run pipeline steps

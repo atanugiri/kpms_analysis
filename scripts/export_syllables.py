@@ -124,6 +124,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "``results/<project_name>/syllable_timeseries/``."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("List discovered results files and exit without writing CSVs."),
+    )
     return parser
 
 
@@ -280,6 +286,13 @@ def main() -> None:
         sys.exit(1)
 
     logger.info("Found %d results file(s).", len(h5_paths))
+
+    # If dry-run, list discovered files and exit without writing CSVs
+    if getattr(args, "dry_run", False):
+        for p in h5_paths:
+            logger.info("[dry-run] would process: %s", p)
+        logger.info("Dry-run complete: no files were written.")
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Export each results file
