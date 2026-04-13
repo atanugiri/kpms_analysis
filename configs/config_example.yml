@@ -38,46 +38,27 @@ recursive_search: true
 # These should match the column headers in your DLC output exactly.
 # TODO: Update to match your specific DLC project.
 bodyparts:
-  - nose
-  - left_ear
-  - right_ear
-  - neck
-  - left_forepaw
-  - right_forepaw
-  - mid_back
-  - left_hindpaw
-  - right_hindpaw
-  - tail_base
-  - tail_mid
-  - tail_tip
+  - Head
+  - Neck
+  - Midback
+  - Lowerback
+  - Tailbase
 
 # Subset of bodyparts to actually use during modeling.
 # Omit noisy or uninformative keypoints here.
 use_bodyparts:
-  - nose
-  - left_ear
-  - right_ear
-  - neck
-  - left_forepaw
-  - right_forepaw
-  - mid_back
-  - left_hindpaw
-  - right_hindpaw
-  - tail_base
+  - Head
+  - Neck
+  - Midback
+  - Lowerback
+  - Tailbase
 
 # Skeleton definition used for visualisation (pairs of bodypart names).
 skeleton:
-  - [nose, neck]
-  - [neck, left_ear]
-  - [neck, right_ear]
-  - [neck, left_forepaw]
-  - [neck, right_forepaw]
-  - [neck, mid_back]
-  - [mid_back, left_hindpaw]
-  - [mid_back, right_hindpaw]
-  - [mid_back, tail_base]
-  - [tail_base, tail_mid]
-  - [tail_mid, tail_tip]
+  - [Head, Neck]
+  - [Neck, Midback]
+  - [Midback, Lowerback]
+  - [Lowerback, Tailbase]
 
 # ---------------------------------------------------------------------------
 # PCA
@@ -121,7 +102,7 @@ save_every_n_iters: 25
 # ---------------------------------------------------------------------------
 
 # Frame rate of the videos (Hz).  Used for duration calculations in analysis.
-fps: 30
+fps: 15
 
 # ---------------------------------------------------------------------------
 # EXAMPLE EXTERNAL PROJECT PATH
