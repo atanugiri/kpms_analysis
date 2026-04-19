@@ -149,6 +149,14 @@ python scripts/run_kpms.py \
 3. Formats data for inference with `kpms.format_data()`.
 4. Fits PCA with `kpms.fit_pca()` and saves it to disk.
 
+> Note: The keypoint-MoSeq **noise calibration** step (`kpms.noise_calibration`) is
+> an interactive JupyterLab widget and is intentionally **not** part of this
+> headless CLI pipeline. If you want to run it, use:
+>
+> ```bash
+> python scripts/run_kpms.py --project-path /path/to/project --launch-noise-calibration
+> ```
+
 ### Step 2: fit
 
 1. Initialises the model with `kpms.init_model()`.

@@ -59,6 +59,8 @@ TODO notes
 
 import argparse
 import logging
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -185,7 +187,54 @@ def _build_parser() -> argparse.ArgumentParser:
             "execute prepare/fit/export steps (useful for CI and checks)."
         ),
     )
+    parser.add_argument(
+        "--launch-noise-calibration",
+        action="store_true",
+        default=False,
+        help=(
+            "Launch JupyterLab to run the interactive noise calibration widget "
+            "(kpms.noise_calibration). This step is Jupyter-only (uses widgets). "
+            "When set, this script will open notebooks/noise_calibration.ipynb "
+            "with project paths pre-filled via environment variables, then exit."
+        ),
+    )
     return parser
+
+
+def _launch_noise_calibration_notebook(
+    project_path: Path,
+    config_path: Path,
+    use_filtered: bool,
+    logger: logging.Logger,
+) -> None:
+    """Launch JupyterLab opening the noise calibration notebook.
+
+    keypoint-MoSeq noise calibration is implemented as a widget intended for
+    JupyterLab (see keypoint_moseq.calibration.noise_calibration docs). We keep
+    the main pipeline headless, and provide this opt-in launcher.
+    """
+    notebook_path = _REPO_ROOT / "notebooks" / "noise_calibration.ipynb"
+    if not notebook_path.exists():
+        logger.error("Calibration notebook not found: %s", notebook_path)
+        sys.exit(1)
+
+    env = os.environ.copy()
+    env["KPMS_PROJECT_PATH"] = str(project_path)
+    env["KPMS_WORKSPACE_CONFIG"] = str(config_path)
+    env["KPMS_USE_FILTERED"] = "1" if use_filtered else "0"
+
+    cmd = ["jupyter", "lab", str(notebook_path)]
+    logger.info("Launching noise calibration in JupyterLab...")
+    logger.info("Command: %s", " ".join(cmd))
+    try:
+        subprocess.run(cmd, env=env, check=False)
+    except FileNotFoundError:
+        logger.error(
+            "Could not find 'jupyter' on PATH. Install JupyterLab (e.g. 'pip install jupyterlab') "
+            "or run it manually: jupyter lab %s",
+            notebook_path,
+        )
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -526,6 +575,19 @@ def main() -> None:
 
     logger.info("Loading workspace config from: %s", config_path)
     config = load_yaml_config(config_path)
+
+    # ------------------------------------------------------------------
+    # Optional: launch interactive noise calibration (Jupyter widget)
+    # ------------------------------------------------------------------
+    if getattr(args, "launch_noise_calibration", False):
+        _launch_noise_calibration_notebook(
+            project_path=project_path,
+            config_path=config_path,
+            use_filtered=use_filtered,
+            logger=logger,
+        )
+        logger.info("Exiting after launching noise calibration.")
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Create output directories
