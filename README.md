@@ -48,6 +48,14 @@ pip install keypoint-moseq
 pip install "keypoint-moseq[gpu]"
 ```
 
+By default, JAX will use a GPU backend when a CUDA-enabled `jaxlib` is installed
+and a GPU is visible. In this workspace you can also explicitly force the JAX
+backend via:
+
+```bash
+python scripts/run_kpms.py --project-path /path/to/project --jax-platform gpu
+```
+
 This workspace also uses standard scientific Python packages (NumPy, pandas, PyYAML) which are pulled in transitively by keypoint-moseq.
 
 ---
@@ -119,6 +127,28 @@ python scripts/run_kpms.py \
 # Export syllable CSVs only (requires a fitted model):
 python scripts/export_syllables.py \
     --project-path /path/to/project
+```
+
+You can also use the small wrapper CLIs (same behavior, fewer flags):
+
+```bash
+python scripts/prepare_kpms.py --project-path /path/to/project --config configs/ElevatedMazeFood.yml
+python scripts/fit_kpms.py     --project-path /path/to/project --config configs/ElevatedMazeFood.yml
+python scripts/export_kpms.py  --project-path /path/to/project --config configs/ElevatedMazeFood.yml
+```
+
+### Resume fitting (no re-prepare)
+
+If you want to tune parameters like `kappa` without re-running `prepare`, you can
+resume from a saved checkpoint directory (the timestamp folder under
+`results/<project>/kpms_project/`). Example:
+
+```bash
+python scripts/fit_kpms.py \
+   --project-path /path/to/project \
+   --resume-model-name 2026_04_13-15_40_25 \
+   --continue-iters 200 \
+   --kappa 1e4
 ```
 
 ### 4 — Use filtered pose data

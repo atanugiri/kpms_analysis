@@ -65,12 +65,6 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Enable JAX 64-bit precision (required by keypoint-moseq)
-# ---------------------------------------------------------------------------
-import jax
-jax.config.update("jax_enable_x64", True)
-
-# ---------------------------------------------------------------------------
 # Allow running this script from any working directory by adding the repo
 # root to sys.path so that ``kpms_utils`` can be imported.
 # ---------------------------------------------------------------------------
@@ -176,6 +170,58 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Name for the model checkpoint directory inside the KPMS project. "
             "If omitted, keypoint-moseq generates a timestamp-based name."
+        ),
+    )
+    parser.add_argument(
+        "--resume-model-name",
+        default=None,
+        help=(
+            "Resume fitting from an existing model directory name (e.g. 2026_04_13-15_40_25). "
+            "When provided, you can run '--steps fit' without rerunning 'prepare'."
+        ),
+    )
+    parser.add_argument(
+        "--resume-iteration",
+        type=int,
+        default=None,
+        help=(
+            "Optional checkpoint iteration to load when resuming. If omitted, keypoint-moseq "
+            "will load the most recent checkpoint it can find for the model."
+        ),
+    )
+    parser.add_argument(
+        "--continue-iters",
+        type=int,
+        default=None,
+        help=(
+            "When resuming, run this many additional fitting iterations beyond the checkpoint's "
+            "current iteration. If omitted, defaults to the 'num_iters' value in your workspace config."
+        ),
+    )
+    parser.add_argument(
+        "--resume-ar-only",
+        action="store_true",
+        default=False,
+        help=(
+            "When resuming, continue AR-only fitting (ar_only=True) instead of the full model."
+        ),
+    )
+    parser.add_argument(
+        "--kappa",
+        type=float,
+        default=None,
+        help=(
+            "Optional: override kappa on resume by calling kpms.update_hypparams(model, kappa=...). "
+            "Useful for kappa tuning without restarting from scratch."
+        ),
+    )
+    parser.add_argument(
+        "--jax-platform",
+        choices=["auto", "cpu", "gpu"],
+        default="auto",
+        help=(
+            "Select the JAX platform backend. 'auto' uses JAX defaults (GPU if available). "
+            "Use 'gpu' on HPC nodes with CUDA-enabled jaxlib installed."
         ),
     )
     parser.add_argument(
@@ -449,6 +495,83 @@ def step_fit(
     return model, model_name
 
 
+def step_resume_fit(
+    kpms_project_dir: Path,
+    config: dict,
+    resume_model_name: str,
+    resume_iteration: int | None,
+    continue_iters: int | None,
+    resume_ar_only: bool,
+    kappa: float | None,
+    logger: logging.Logger,
+) -> tuple:
+    """Resume fitting from a saved checkpoint without re-running prepare.
+
+    This mirrors the tutorial workflow:
+    - load checkpoint (model, data, metadata, current_iter)
+    - optionally update kappa in-memory
+    - continue fitting for additional iterations
+
+    Returns
+    -------
+    tuple
+        (model, model_name)
+    """
+    import keypoint_moseq as kpms  # noqa: PLC0415
+
+    logger.info(
+        "Resuming from checkpoint: model_name=%s iteration=%s",
+        resume_model_name,
+        "latest" if resume_iteration is None else str(resume_iteration),
+    )
+
+    if resume_iteration is None:
+        model, data, metadata, current_iter = kpms.load_checkpoint(
+            project_dir=str(kpms_project_dir),
+            model_name=resume_model_name,
+        )
+    else:
+        model, data, metadata, current_iter = kpms.load_checkpoint(
+            project_dir=str(kpms_project_dir),
+            model_name=resume_model_name,
+            iteration=resume_iteration,
+        )
+
+    logger.info("Loaded checkpoint at iteration %s.", current_iter)
+
+    if kappa is not None:
+        logger.info("Updating kappa to %s before continuing.", kappa)
+        model = kpms.update_hypparams(model, kappa=kappa)
+
+    save_every: int | None = config.get("save_every_n_iters", 25)
+    default_continue: int = config.get("num_iters", 200)
+    additional = default_continue if continue_iters is None else continue_iters
+    end_iter = int(current_iter) + int(additional)
+
+    logger.info(
+        "Continuing fit (ar_only=%s) from iter=%s for %s iters → end_iter=%s.",
+        resume_ar_only,
+        current_iter,
+        additional,
+        end_iter,
+    )
+
+    model, model_name = kpms.fit_model(
+        model,
+        data,
+        metadata,
+        project_dir=str(kpms_project_dir),
+        model_name=resume_model_name,
+        ar_only=resume_ar_only,
+        start_iter=current_iter,
+        num_iters=end_iter,
+        save_every_n_iters=save_every,
+    )
+
+    logger.info("Resume fitting complete. Model name: %s", model_name)
+    return model, model_name
+
+
 # ---------------------------------------------------------------------------
 # Step 3: Export
 # ---------------------------------------------------------------------------
@@ -522,6 +645,24 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
+    # ------------------------------------------------------------------
+    # Configure JAX as early as possible (before importing keypoint_moseq)
+    # ------------------------------------------------------------------
+    try:
+        import jax  # noqa: PLC0415
+
+        # Force 64-bit precision (required by keypoint-moseq)
+        jax.config.update("jax_enable_x64", True)
+
+        # Optionally force a specific backend (useful on HPC)
+        if getattr(args, "jax_platform", "auto") != "auto":
+            jax.config.update("jax_platform_name", args.jax_platform)
+    except Exception as exc:
+        raise RuntimeError(
+            "Failed to import/configure JAX. Ensure keypoint-moseq (and jax/jaxlib) are installed. "
+            "For GPU nodes, install a CUDA-enabled jaxlib (e.g. via keypoint-moseq[gpu])."
+        ) from exc
+
     project_path = Path(args.project_path).resolve()
     use_filtered: bool = args.use_filtered
     steps: list[str] = args.steps
@@ -539,6 +680,14 @@ def main() -> None:
     # Set up logging
     # ------------------------------------------------------------------
     logger = _setup_logging(log_path)
+    try:
+        import jax  # noqa: PLC0415
+
+        logger.info("JAX backend  : %s", jax.default_backend())
+        logger.info("JAX devices  : %s", ", ".join(str(d) for d in jax.devices()))
+    except Exception:
+        # Avoid failing just because device reporting failed.
+        pass
     logger.info("=" * 60)
     logger.info("Project     : %s", project_path)
     logger.info("Pose data   : %s", pose_data_dir)
@@ -623,34 +772,43 @@ def main() -> None:
 
     if "fit" in steps:
         if data is None or kpms_config is None:
-            # Reload from disk when skipping prepare
-            import keypoint_moseq as kpms  # noqa: PLC0415
-            kpms_config = kpms.load_config(str(kpms_project_dir))
-            pca = kpms.load_pca(str(kpms_project_dir))
-            logger.warning(
-                "Step 'prepare' was skipped; loading PCA from disk. "
-                "Make sure pose data was formatted in a previous run."
-            )
-            # TODO: data and metadata are not persisted between runs in this
-            #       minimal implementation.  If you skip 'prepare', ensure you
-            #       have a checkpoint to resume from and use apply_model
-            #       instead of fit_model.
-            logger.error(
-                "Cannot run 'fit' without 'prepare' in this run "
-                "(data/metadata not available).  Add 'prepare' to --steps."
-            )
-            sys.exit(1)
+            if getattr(args, "resume_model_name", None):
+                model, model_name = step_resume_fit(
+                    kpms_project_dir=kpms_project_dir,
+                    config=config,
+                    resume_model_name=args.resume_model_name,
+                    resume_iteration=args.resume_iteration,
+                    continue_iters=args.continue_iters,
+                    resume_ar_only=args.resume_ar_only,
+                    kappa=args.kappa,
+                    logger=logger,
+                )
+            else:
+                # Reload from disk when skipping prepare
+                import keypoint_moseq as kpms  # noqa: PLC0415
+                kpms_config = kpms.load_config(str(kpms_project_dir))
+                pca = kpms.load_pca(str(kpms_project_dir))
+                logger.warning(
+                    "Step 'prepare' was skipped; loading PCA from disk. "
+                    "Make sure pose data was formatted in a previous run."
+                )
+                logger.error(
+                    "Cannot run 'fit' without 'prepare' in this run (data/metadata not available). "
+                    "Either add 'prepare' to --steps, or use --resume-model-name to resume from a checkpoint."
+                )
+                sys.exit(1)
 
-        model, model_name = step_fit(
-            data=data,
-            metadata=metadata,
-            pca=pca,
-            kpms_project_dir=kpms_project_dir,
-            kpms_config=kpms_config,
-            config=config,
-            model_name=model_name,
-            logger=logger,
-        )
+        if model is None or model_name is None:
+            model, model_name = step_fit(
+                data=data,
+                metadata=metadata,
+                pca=pca,
+                kpms_project_dir=kpms_project_dir,
+                kpms_config=kpms_config,
+                config=config,
+                model_name=model_name,
+                logger=logger,
+            )
 
     if "export" in steps:
         if model is None or model_name is None:
