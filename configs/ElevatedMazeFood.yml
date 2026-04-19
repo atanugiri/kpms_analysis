@@ -74,7 +74,7 @@ posterior_bodyparts:
 
 # Number of PCA components to retain for the latent trajectory.
 # TODO: Inspect the explained-variance plot after fitting PCA and adjust.
-latent_dim: 4
+latent_dim: 8
 
 # Minimum fraction of variance to explain (used for automatic selection).
 # Only applied if latent_dim is not set explicitly.

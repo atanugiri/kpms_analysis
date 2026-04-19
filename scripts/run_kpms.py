@@ -63,6 +63,12 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
+# Enable JAX 64-bit precision (required by keypoint-moseq)
+# ---------------------------------------------------------------------------
+import jax
+jax.config.update("jax_enable_x64", True)
+
+# ---------------------------------------------------------------------------
 # Allow running this script from any working directory by adding the repo
 # root to sys.path so that ``kpms_utils`` can be imported.
 # ---------------------------------------------------------------------------
@@ -230,7 +236,7 @@ def step_prepare(
     # TODO: Extend this dict with any additional options you want to seed
     #       into the generated config.yml.
     setup_kwargs: dict = {}
-    for key in ("bodyparts", "use_bodyparts", "skeleton", "anterior_bodyparts", "posterior_bodyparts", "fps"):
+    for key in ("bodyparts", "use_bodyparts", "skeleton", "anterior_bodyparts", "posterior_bodyparts", "fps", "latent_dim", "num_states", "kappa", "num_iters", "ar_iters", "save_every_n_iters"):
         if key in config:
             setup_kwargs[key] = config[key]
 
@@ -283,6 +289,18 @@ def step_prepare(
         confidences,
         **kpms_config,
     )
+
+    # Convert data to 64-bit precision for JAX
+    logger.info("Converting data to 64-bit precision.")
+    try:
+        from jax_moseq.utils.debugging import convert_data_precision
+        data = convert_data_precision(data)
+    except (ImportError, AttributeError, TypeError):
+        # Fallback: manually convert arrays
+        import jax.numpy as jnp
+        for key in data:
+            if hasattr(data[key], 'dtype'):
+                data[key] = jnp.asarray(data[key], dtype=jnp.float64)
 
     # ------------------------------------------------------------------
     # 1d. Fit PCA
