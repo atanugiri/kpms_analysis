@@ -43,7 +43,7 @@ Pipeline steps
 2. **fit** – Initialise and fit the AR-HMM + keypoint-SLDS model.
 3. **export** – Extract per-recording syllable sequences and save as CSV.
 
-TODO notes
+# TODO notes
 ----------
 * ``kpms.setup_project`` can optionally accept a DLC ``config.yml`` path via
   ``deeplabcut_config=``.  If your project has one, pass ``--dlc-config``.

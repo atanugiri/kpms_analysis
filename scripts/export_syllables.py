@@ -30,7 +30,7 @@ Load results from an explicit HDF5 path:
         --project-path /path/to/project \\
         --results-h5 results/my_project/kpms_project/my_model/results.h5
 
-TODO notes
+# TODO notes
 ----------
 * ``kpms.load_results`` expects the path
   ``<kpms_project_dir>/<model_name>/results.h5``.  If model discovery fails,
