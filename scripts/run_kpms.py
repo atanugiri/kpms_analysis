@@ -79,6 +79,7 @@ from kpms_utils.path_utils import (
     get_kpms_project_dir,
     get_log_path,
 )
+from kpms_utils.config_utils import load_yaml_config
 from kpms_utils.logging_utils import setup_logging
 
 # ---------------------------------------------------------------------------
