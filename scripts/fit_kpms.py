@@ -21,9 +21,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from kpms_utils import ensure_repo_in_path, build_cmd_list
+# Ensure repo is in path before importing kpms_utils
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-ensure_repo_in_path()
+from kpms_utils import build_cmd_list
 
 
 def main() -> None:

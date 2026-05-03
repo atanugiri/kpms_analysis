@@ -28,6 +28,13 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+# Ensure repo is in path before importing kpms_utils
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from kpms_utils import resolve_results_dir
+
 try:
     import matplotlib.pyplot as plt
 except ModuleNotFoundError as exc:  # pragma: no cover
@@ -40,9 +47,19 @@ except ModuleNotFoundError as exc:  # pragma: no cover
     ) from exc
 
 
-# Allow running from any working directory
-from kpms_utils import ensure_repo_in_path, resolve_results_dir
-ensure_repo_in_path()
+def _read_recording_csv(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    return df
+
+
+def plot_syllable_timeseries(
+    sequences: Iterable[tuple[str, np.ndarray]],
+    fps: float = 15.0,
+    ax: plt.Axes | None = None,
+    cmap: str = "tab20",
+    xlabel: str = "Time (s)",
+    title: str | None = None,
+    show_legend: bool = False,
 
 
 def _read_recording_csv(path: Path) -> pd.DataFrame:
