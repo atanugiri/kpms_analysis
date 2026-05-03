@@ -21,6 +21,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from kpms_utils import ensure_repo_in_path, build_cmd_list
+
+ensure_repo_in_path()
+
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
@@ -40,7 +44,7 @@ def main() -> None:
     parser.add_argument("--jax-platform", choices=["auto", "cpu", "gpu"], default="auto")
     args = parser.parse_args()
 
-    cmd = [
+    base_cmd = [
         sys.executable,
         str(run_script),
         "--project-path",
@@ -52,20 +56,8 @@ def main() -> None:
         "--jax-platform",
         args.jax_platform,
     ]
-
-    if args.model_name:
-        cmd.extend(["--model-name", args.model_name])
-
-    if args.resume_model_name:
-        cmd.extend(["--resume-model-name", args.resume_model_name])
-    if args.resume_iteration is not None:
-        cmd.extend(["--resume-iteration", str(args.resume_iteration)])
-    if args.continue_iters is not None:
-        cmd.extend(["--continue-iters", str(args.continue_iters)])
-    if args.resume_ar_only:
-        cmd.append("--resume-ar-only")
-    if args.kappa is not None:
-        cmd.extend(["--kappa", str(args.kappa)])
+    
+    cmd = build_cmd_list(base_cmd, args)
 
     raise SystemExit(subprocess.call(cmd))
 

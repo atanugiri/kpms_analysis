@@ -41,9 +41,8 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 
 
 # Allow running from any working directory
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
+from kpms_utils import ensure_repo_in_path, resolve_results_dir
+ensure_repo_in_path()
 
 
 def _read_recording_csv(path: Path) -> pd.DataFrame:
@@ -149,35 +148,6 @@ def plot_syllable_timeseries(
     ax.set_xlim(0, max_len / float(fps))
 
     return ax
-
-
-def resolve_results_dir(project_path: Path) -> Path:
-    """Resolve the repo `results/<project_name>/` directory.
-
-    `--project-path` can be either:
-    1) The external DLC project directory (contains raw_pose_data/), or
-    2) The repo results directory itself: results/<project_name>/
-    """
-    p = project_path.resolve()
-
-    # If the user pointed at a subfolder inside the results dir, normalize.
-    if p.name in {"kpms_project", "syllables", "syllable_timeseries"}:
-        return p.parent
-
-    # If the user already pointed at the repo results folder, use it.
-    if (p / "kpms_project").exists() or (p / "syllables").exists() or (p / "syllable_timeseries").exists():
-        return p
-
-    # Otherwise, treat it as an external project path and map to repo results.
-    try:
-        from kpms_utils.path_utils import get_results_dir
-
-        return get_results_dir(p)
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError(
-            "Could not resolve results directory from --project-path. "
-            "Pass either the external project directory or the repo results/<project_name>/ folder."
-        ) from exc
 
 
 def find_syllable_csvs(

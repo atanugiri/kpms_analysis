@@ -144,3 +144,50 @@ def get_log_path(project_path: str | Path) -> Path:
     """
     project_name = get_project_name(project_path)
     return get_repo_root() / "logs" / f"{project_name}.log"
+
+
+def resolve_results_dir(project_path: str | Path) -> Path:
+    """Resolve the repo ``results/<project_name>/`` directory.
+
+    The ``project_path`` argument can point to either:
+
+    1. The external DLC project directory (contains ``raw_pose_data/``), or
+    2. The repo results directory itself: ``results/<project_name>/``, or
+    3. A subfolder within the results directory (e.g., ``kpms_project/``)
+
+    This function normalizes all three cases to return the repo results folder.
+
+    Parameters
+    ----------
+    project_path : str or Path
+        Path to the external DLC project, or the repo results directory,
+        or a subdirectory within the results directory.
+
+    Returns
+    -------
+    Path
+        Absolute path to ``<repo_root>/results/<project_name>/``.
+
+    Raises
+    ------
+    RuntimeError
+        If the path cannot be resolved to a valid results directory.
+    """
+    p = Path(project_path).resolve()
+
+    # If the user pointed at a subfolder inside the results dir, normalize.
+    if p.name in {"kpms_project", "syllables", "syllable_timeseries"}:
+        return p.parent
+
+    # If the user already pointed at the repo results folder, use it.
+    if (p / "kpms_project").exists() or (p / "syllables").exists() or (p / "syllable_timeseries").exists():
+        return p
+
+    # Otherwise, treat it as an external project path and map to repo results.
+    try:
+        return get_results_dir(p)
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Could not resolve results directory from project_path. "
+            "Pass either the external project directory or the repo results/<project_name>/ folder."
+        ) from exc

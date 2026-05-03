@@ -68,9 +68,8 @@ from pathlib import Path
 # Allow running this script from any working directory by adding the repo
 # root to sys.path so that ``kpms_utils`` can be imported.
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
+from kpms_utils import ensure_repo_in_path
+_REPO_ROOT = ensure_repo_in_path()
 
 from kpms_utils.path_utils import (
     get_project_name,
@@ -80,33 +79,7 @@ from kpms_utils.path_utils import (
     get_kpms_project_dir,
     get_log_path,
 )
-from kpms_utils.config_utils import load_yaml_config, merge_config
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-def _setup_logging(log_path: Path) -> logging.Logger:
-    """Configure a logger that writes to both *stdout* and a log file.
-
-    Parameters
-    ----------
-    log_path : Path
-        Destination file for log output.
-
-    Returns
-    -------
-    logging.Logger
-    """
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    fmt = "%(asctime)s [%(levelname)s] %(message)s"
-    handlers: list[logging.Handler] = [
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(log_path),
-    ]
-    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
-    return logging.getLogger(__name__)
-
+from kpms_utils.logging_utils import setup_logging
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -679,7 +652,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Set up logging
     # ------------------------------------------------------------------
-    logger = _setup_logging(log_path)
+    logger = setup_logging(log_path)
     try:
         import jax  # noqa: PLC0415
 

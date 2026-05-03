@@ -10,6 +10,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from kpms_utils import ensure_repo_in_path, build_cmd_list
+
+ensure_repo_in_path()
+
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
@@ -23,7 +27,7 @@ def main() -> None:
     parser.add_argument("--jax-platform", choices=["auto", "cpu", "gpu"], default="auto")
     args = parser.parse_args()
 
-    cmd = [
+    base_cmd = [
         sys.executable,
         str(run_script),
         "--project-path",
@@ -35,10 +39,8 @@ def main() -> None:
         "--jax-platform",
         args.jax_platform,
     ]
-    if args.use_filtered:
-        cmd.append("--use-filtered")
-    if args.dlc_config:
-        cmd.extend(["--dlc-config", args.dlc_config])
+    
+    cmd = build_cmd_list(base_cmd, args)
 
     raise SystemExit(subprocess.call(cmd))
 
