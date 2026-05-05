@@ -43,6 +43,8 @@ def main() -> None:
     parser.add_argument("--preprocessed", default=None, help="Path to preprocessed_data.pkl")
     parser.add_argument("--formatted", default=None, help="Path to formatted_data.pkl (contains data, metadata)")
     parser.add_argument("--jax-platform", choices=["auto", "cpu", "gpu"], default="auto")
+    parser.add_argument("--plot", action="store_true", help="Generate and save PCA diagnostic plots to the KPMS project figures/ folder")
+    parser.add_argument("--explained-variance", type=float, default=0.9, help="Threshold for dims to explain variance when printing" )
     args = parser.parse_args()
 
     project_path = Path(args.project_path).resolve()
@@ -133,6 +135,37 @@ def main() -> None:
     logger.info("Saved metadata to: %s", meta_path)
 
     logger.info("04_fit_pca complete.")
+
+    # Optional plotting/visualization
+    if args.plot:
+        fig_dir = kpms_project_dir / "figures"
+        fig_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info("Printing number of components to reach %.2f explained variance", args.explained_variance)
+        if hasattr(kpms, "print_dims_to_explain_variance"):
+            try:
+                kpms.print_dims_to_explain_variance(pca, args.explained_variance)
+            except Exception as exc:  # pragma: no cover - plotting optional
+                logger.warning("print_dims_to_explain_variance failed: %s", exc)
+        else:
+            logger.warning("kpms.print_dims_to_explain_variance not available in installed keypoint_moseq")
+
+        logger.info("Generating scree plot and component visualizations (saved under %s)", fig_dir)
+        if hasattr(kpms, "plot_scree"):
+            try:
+                kpms.plot_scree(pca, project_dir=str(kpms_project_dir))
+            except Exception as exc:  # pragma: no cover - plotting optional
+                logger.warning("plot_scree failed: %s", exc)
+        else:
+            logger.warning("kpms.plot_scree not available in installed keypoint_moseq")
+
+        if hasattr(kpms, "plot_pcs"):
+            try:
+                kpms.plot_pcs(pca, project_dir=str(kpms_project_dir))
+            except Exception as exc:  # pragma: no cover - plotting optional
+                logger.warning("plot_pcs failed: %s", exc)
+        else:
+            logger.warning("kpms.plot_pcs not available in installed keypoint_moseq; skipping")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ set -euo pipefail
 
 # <- EDIT THIS to your workspace root on the cluster
 WORK=/work/agiri
-PROJECT_DIR="$WORK/ElevatedMazeFood-Atanu-2026-04-04"
+PROJECT_DIR="$WORK/kpms_analysis/results/Black-ToyStick"
 CONDA_ENV_NAME=keypoint_moseq
 
 mkdir -p "$WORK/logs" "$WORK/.cache" "$WORK/pip-cache" "$WORK/mplconfig" "$WORK/tmp" "$WORK/home_fake"
@@ -52,6 +52,10 @@ cd "$WORK/kpms_analysis"
 # same project directory. No external DLC project files are needed here.
 python scripts/04_fit_pca.py \
   --project-path "$PROJECT_DIR" \
-  --jax-platform gpu
+  --preprocessed "$PROJECT_DIR/kpms_project/preprocessed_data.pkl" \
+  --formatted "$PROJECT_DIR/kpms_project/formatted_data.pkl" \
+  --jax-platform gpu \
+  --explained-variance 0.9 \
+  --plot
 
 echo "Job completed at $(date)"

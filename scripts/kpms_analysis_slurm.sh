@@ -50,6 +50,6 @@ cd "$WORK/kpms_analysis"
 # Run the pipeline (example)
 python scripts/run_kpms.py \
   --project-path "$PROJECT_DIR" \
-  --config "$WORK/kpms_analysis/configs/ElevatedMazeFood.yml" \
+  --config "$WORK/kpms_analysis/configs/BlackToyStick.yml" \
   --steps prepare fit export \
   --jax-platform gpu
