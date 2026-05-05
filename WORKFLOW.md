@@ -27,8 +27,8 @@ python scripts/02_load_and_preprocess.py --project-path "$PROJECT_PATH" --config
 # Launch JupyterLab manually or use the launcher script
 python scripts/03_noise_calibration.ipynb
 
-# Step 4: fit PCA (uses preprocessed/formatted files)
-python scripts/04_fit_pca.py --project-path "$PROJECT_PATH" --config "$CONFIG" --jax-platform gpu
+# Step 4: fit PCA (uses preprocessed/formatted files and the calibrated project config)
+python scripts/04_fit_pca.py --project-path "$PROJECT_PATH" --jax-platform gpu
 
 # Step 5: fit model (train)
 python scripts/05_fit_model.py --project-path "$PROJECT_PATH" --config "$CONFIG" --jax-platform gpu

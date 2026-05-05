@@ -8,7 +8,7 @@ via `kpms.fit_pca(...)`, and saves the PCA object to the KPMS project.
 
 Usage
 -----
-python scripts/04_fit_pca.py --project-path /path/to/project --config configs/my.yml [--use-filtered] [--preprocessed path]
+python scripts/04_fit_pca.py --project-path /path/to/project [--use-filtered] [--preprocessed path]
 """
 
 import argparse
@@ -22,7 +22,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from kpms_utils.logging_utils import setup_logging
-from kpms_utils.config_utils import load_yaml_config
 from kpms_utils.path_utils import get_kpms_project_dir, get_pose_data_dir, get_log_path
 
 
@@ -40,7 +39,6 @@ def configure_jax(platform: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fit PCA and save to KPMS project.")
     parser.add_argument("--project-path", required=True)
-    parser.add_argument("--config", default=str(_REPO_ROOT / "configs" / "config_example.yml"))
     parser.add_argument("--use-filtered", action="store_true", default=False)
     parser.add_argument("--preprocessed", default=None, help="Path to preprocessed_data.pkl")
     parser.add_argument("--formatted", default=None, help="Path to formatted_data.pkl (contains data, metadata)")
@@ -48,9 +46,6 @@ def main() -> None:
     args = parser.parse_args()
 
     project_path = Path(args.project_path).resolve()
-    config_path = Path(args.config)
-    if not config_path.is_absolute():
-        config_path = _REPO_ROOT / config_path
 
     log_path = get_log_path(project_path)
     logger = setup_logging(log_path)
@@ -61,7 +56,6 @@ def main() -> None:
         logger.error("Project path does not exist: %s", project_path)
         raise SystemExit(1)
 
-    config = load_yaml_config(str(config_path))
     kpms_project_dir = get_kpms_project_dir(project_path)
 
     import keypoint_moseq as kpms  # noqa: PLC0415

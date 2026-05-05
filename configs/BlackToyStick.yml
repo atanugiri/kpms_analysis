@@ -1,0 +1,119 @@
+# ---------------------------------------------------------------------------
+# config_example.yml
+#
+# Example configuration for the keypoint-moseq analysis workspace.
+# Copy this file (e.g. to configs/my_project.yml) and edit as needed.
+#
+# The external DLC project path is supplied at runtime via --project-path
+# (see scripts/run_kpms.py).  The settings below control the keypoint-moseq
+# model itself.
+#
+# For full documentation of all available options, see:
+#   https://keypoint-moseq.readthedocs.io/en/latest/
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# POSE ESTIMATION INPUT
+# ---------------------------------------------------------------------------
+
+# Format of the pose-estimation files inside the project's pose-data folder.
+# Supported values: "deeplabcut", "sleap", "anipose", "sleap-anipose", "nwb",
+#                   "facemap", "freipose", "dannce"
+# TODO: Verify that this matches the format produced by your tracking software.
+pose_estimation_format: "deeplabcut"
+
+# File extension to look for inside raw_pose_data/ or filtered_pose_data/.
+# Leave as null to let keypoint-moseq infer it from pose_estimation_format.
+# Common values: "csv", "h5"
+pose_file_extension: h5   # e.g. "csv"
+
+# Whether to search sub-directories of the pose-data folder recursively.
+recursive_search: true
+
+# ---------------------------------------------------------------------------
+# BODYPARTS
+# ---------------------------------------------------------------------------
+
+# Full list of keypoints produced by the pose estimator.
+# These should match the column headers in your DLC output exactly.
+# TODO: Update to match your specific DLC project.
+bodyparts:
+  - Head
+  - Neck
+  - Midback
+  - Lowerback
+  - Tailbase
+
+# Subset of bodyparts to actually use during modeling.
+# Omit noisy or uninformative keypoints here.
+use_bodyparts:
+  - Head
+  - Neck
+  - Midback
+  - Lowerback
+  - Tailbase
+
+# Skeleton definition used for visualisation (pairs of bodypart names).
+skeleton:
+  - [Head, Neck]
+  - [Neck, Midback]
+  - [Midback, Lowerback]
+  - [Lowerback, Tailbase]
+
+# Anterior bodyparts (typically head/nose area) for skeletal constraints.
+anterior_bodyparts:
+  - Head
+
+# Posterior bodyparts (typically tail area) for skeletal constraints.
+posterior_bodyparts:
+  - Tailbase
+
+# ---------------------------------------------------------------------------
+# PCA
+# ---------------------------------------------------------------------------
+
+# Number of PCA components to retain for the latent trajectory.
+# TODO: Inspect the explained-variance plot after fitting PCA and adjust.
+latent_dim: 4
+
+# Minimum fraction of variance to explain (used for automatic selection).
+# Only applied if latent_dim is not set explicitly.
+# pca_variance_threshold: 0.9
+
+# ---------------------------------------------------------------------------
+# MODEL HYPERPARAMETERS
+# ---------------------------------------------------------------------------
+
+# Number of discrete syllables (states) in the ARHMM.
+# TODO: Increase for complex behaviours; start with 100 as a reasonable default.
+num_states: 30
+
+# Kappa controls the tendency to stay in the same syllable (stickiness).
+# Higher values → longer syllables.  Typical range: 1e3–1e6.
+# TODO: Tune after inspecting syllable duration distributions.
+kappa: 1.0e+05
+
+# ---------------------------------------------------------------------------
+# FITTING
+# ---------------------------------------------------------------------------
+
+# Total number of Gibbs-sampling iterations.
+# AR-only phase runs for ar_iters iterations; full model for the remainder.
+num_iters: 200
+ar_iters: 50
+
+# Save a checkpoint every N iterations (set to null to skip intermediate saves).
+save_every_n_iters: 25
+
+# ---------------------------------------------------------------------------
+# RECORDING METADATA (optional)
+# ---------------------------------------------------------------------------
+
+# Frame rate of the videos (Hz).  Used for duration calculations in analysis.
+fps: 10
+
+# ---------------------------------------------------------------------------
+# EXAMPLE EXTERNAL PROJECT PATH
+# (for documentation purposes only – override at runtime with --project-path)
+# ---------------------------------------------------------------------------
+# example_project_path: /Users/atanugiri/Downloads/dlc-pose-estimation/ElevatedMazeFood-Atanu-2026-04-04
