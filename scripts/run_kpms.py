@@ -43,7 +43,7 @@ Pipeline steps
 2. **fit** – Initialise and fit the AR-HMM + keypoint-SLDS model.
 3. **export** – Extract per-recording syllable sequences and save as CSV.
 
-TODO notes
+# TODO notes
 ----------
 * ``kpms.setup_project`` can optionally accept a DLC ``config.yml`` path via
   ``deeplabcut_config=``.  If your project has one, pass ``--dlc-config``.
@@ -59,6 +59,8 @@ TODO notes
 
 import argparse
 import logging
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -66,9 +68,8 @@ from pathlib import Path
 # Allow running this script from any working directory by adding the repo
 # root to sys.path so that ``kpms_utils`` can be imported.
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
+from kpms_utils import ensure_repo_in_path
+_REPO_ROOT = ensure_repo_in_path()
 
 from kpms_utils.path_utils import (
     get_project_name,
@@ -78,33 +79,8 @@ from kpms_utils.path_utils import (
     get_kpms_project_dir,
     get_log_path,
 )
-from kpms_utils.config_utils import load_yaml_config, merge_config
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-def _setup_logging(log_path: Path) -> logging.Logger:
-    """Configure a logger that writes to both *stdout* and a log file.
-
-    Parameters
-    ----------
-    log_path : Path
-        Destination file for log output.
-
-    Returns
-    -------
-    logging.Logger
-    """
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    fmt = "%(asctime)s [%(levelname)s] %(message)s"
-    handlers: list[logging.Handler] = [
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(log_path),
-    ]
-    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
-    return logging.getLogger(__name__)
-
+from kpms_utils.config_utils import load_yaml_config
+from kpms_utils.logging_utils import setup_logging
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -170,7 +146,115 @@ def _build_parser() -> argparse.ArgumentParser:
             "If omitted, keypoint-moseq generates a timestamp-based name."
         ),
     )
+    parser.add_argument(
+        "--resume-model-name",
+        default=None,
+        help=(
+            "Resume fitting from an existing model directory name (e.g. 2026_04_13-15_40_25). "
+            "When provided, you can run '--steps fit' without rerunning 'prepare'."
+        ),
+    )
+    parser.add_argument(
+        "--resume-iteration",
+        type=int,
+        default=None,
+        help=(
+            "Optional checkpoint iteration to load when resuming. If omitted, keypoint-moseq "
+            "will load the most recent checkpoint it can find for the model."
+        ),
+    )
+    parser.add_argument(
+        "--continue-iters",
+        type=int,
+        default=None,
+        help=(
+            "When resuming, run this many additional fitting iterations beyond the checkpoint's "
+            "current iteration. If omitted, defaults to the 'num_iters' value in your workspace config."
+        ),
+    )
+    parser.add_argument(
+        "--resume-ar-only",
+        action="store_true",
+        default=False,
+        help=(
+            "When resuming, continue AR-only fitting (ar_only=True) instead of the full model."
+        ),
+    )
+    parser.add_argument(
+        "--kappa",
+        type=float,
+        default=None,
+        help=(
+            "Optional: override kappa on resume by calling kpms.update_hypparams(model, kappa=...). "
+            "Useful for kappa tuning without restarting from scratch."
+        ),
+    )
+    parser.add_argument(
+        "--jax-platform",
+        choices=["auto", "cpu", "gpu"],
+        default="auto",
+        help=(
+            "Select the JAX platform backend. 'auto' uses JAX defaults (GPU if available). "
+            "Use 'gpu' on HPC nodes with CUDA-enabled jaxlib installed."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=(
+            "Validate the external project and configuration but do not "
+            "execute prepare/fit/export steps (useful for CI and checks)."
+        ),
+    )
+    parser.add_argument(
+        "--launch-noise-calibration",
+        action="store_true",
+        default=False,
+        help=(
+            "Launch JupyterLab to run the interactive noise calibration widget "
+            "(kpms.noise_calibration). This step is Jupyter-only (uses widgets). "
+            "When set, this script will open notebooks/noise_calibration.ipynb "
+            "with project paths pre-filled via environment variables, then exit."
+        ),
+    )
     return parser
+
+
+def _launch_noise_calibration_notebook(
+    project_path: Path,
+    config_path: Path,
+    use_filtered: bool,
+    logger: logging.Logger,
+) -> None:
+    """Launch JupyterLab opening the noise calibration notebook.
+
+    keypoint-MoSeq noise calibration is implemented as a widget intended for
+    JupyterLab (see keypoint_moseq.calibration.noise_calibration docs). We keep
+    the main pipeline headless, and provide this opt-in launcher.
+    """
+    notebook_path = _REPO_ROOT / "notebooks" / "noise_calibration.ipynb"
+    if not notebook_path.exists():
+        logger.error("Calibration notebook not found: %s", notebook_path)
+        sys.exit(1)
+
+    env = os.environ.copy()
+    env["KPMS_PROJECT_PATH"] = str(project_path)
+    env["KPMS_WORKSPACE_CONFIG"] = str(config_path)
+    env["KPMS_USE_FILTERED"] = "1" if use_filtered else "0"
+
+    cmd = ["jupyter", "lab", str(notebook_path)]
+    logger.info("Launching noise calibration in JupyterLab...")
+    logger.info("Command: %s", " ".join(cmd))
+    try:
+        subprocess.run(cmd, env=env, check=False)
+    except FileNotFoundError:
+        logger.error(
+            "Could not find 'jupyter' on PATH. Install JupyterLab (e.g. 'pip install jupyterlab') "
+            "or run it manually: jupyter lab %s",
+            notebook_path,
+        )
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +305,7 @@ def step_prepare(
     # TODO: Extend this dict with any additional options you want to seed
     #       into the generated config.yml.
     setup_kwargs: dict = {}
-    for key in ("bodyparts", "use_bodyparts", "skeleton"):
+    for key in ("bodyparts", "use_bodyparts", "skeleton", "anterior_bodyparts", "posterior_bodyparts", "fps", "latent_dim", "num_states", "kappa", "num_iters", "ar_iters", "save_every_n_iters"):
         if key in config:
             setup_kwargs[key] = config[key]
 
@@ -274,6 +358,18 @@ def step_prepare(
         confidences,
         **kpms_config,
     )
+
+    # Convert data to 64-bit precision for JAX
+    logger.info("Converting data to 64-bit precision.")
+    try:
+        from jax_moseq.utils.debugging import convert_data_precision
+        data = convert_data_precision(data)
+    except (ImportError, AttributeError, TypeError):
+        # Fallback: manually convert arrays
+        import jax.numpy as jnp
+        for key in data:
+            if hasattr(data[key], 'dtype'):
+                data[key] = jnp.asarray(data[key], dtype=jnp.float64)
 
     # ------------------------------------------------------------------
     # 1d. Fit PCA
@@ -373,6 +469,83 @@ def step_fit(
     return model, model_name
 
 
+def step_resume_fit(
+    kpms_project_dir: Path,
+    config: dict,
+    resume_model_name: str,
+    resume_iteration: int | None,
+    continue_iters: int | None,
+    resume_ar_only: bool,
+    kappa: float | None,
+    logger: logging.Logger,
+) -> tuple:
+    """Resume fitting from a saved checkpoint without re-running prepare.
+
+    This mirrors the tutorial workflow:
+    - load checkpoint (model, data, metadata, current_iter)
+    - optionally update kappa in-memory
+    - continue fitting for additional iterations
+
+    Returns
+    -------
+    tuple
+        (model, model_name)
+    """
+    import keypoint_moseq as kpms  # noqa: PLC0415
+
+    logger.info(
+        "Resuming from checkpoint: model_name=%s iteration=%s",
+        resume_model_name,
+        "latest" if resume_iteration is None else str(resume_iteration),
+    )
+
+    if resume_iteration is None:
+        model, data, metadata, current_iter = kpms.load_checkpoint(
+            project_dir=str(kpms_project_dir),
+            model_name=resume_model_name,
+        )
+    else:
+        model, data, metadata, current_iter = kpms.load_checkpoint(
+            project_dir=str(kpms_project_dir),
+            model_name=resume_model_name,
+            iteration=resume_iteration,
+        )
+
+    logger.info("Loaded checkpoint at iteration %s.", current_iter)
+
+    if kappa is not None:
+        logger.info("Updating kappa to %s before continuing.", kappa)
+        model = kpms.update_hypparams(model, kappa=kappa)
+
+    save_every: int | None = config.get("save_every_n_iters", 25)
+    default_continue: int = config.get("num_iters", 200)
+    additional = default_continue if continue_iters is None else continue_iters
+    end_iter = int(current_iter) + int(additional)
+
+    logger.info(
+        "Continuing fit (ar_only=%s) from iter=%s for %s iters → end_iter=%s.",
+        resume_ar_only,
+        current_iter,
+        additional,
+        end_iter,
+    )
+
+    model, model_name = kpms.fit_model(
+        model,
+        data,
+        metadata,
+        project_dir=str(kpms_project_dir),
+        model_name=resume_model_name,
+        ar_only=resume_ar_only,
+        start_iter=current_iter,
+        num_iters=end_iter,
+        save_every_n_iters=save_every,
+    )
+
+    logger.info("Resume fitting complete. Model name: %s", model_name)
+    return model, model_name
+
+
 # ---------------------------------------------------------------------------
 # Step 3: Export
 # ---------------------------------------------------------------------------
@@ -446,6 +619,24 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
+    # ------------------------------------------------------------------
+    # Configure JAX as early as possible (before importing keypoint_moseq)
+    # ------------------------------------------------------------------
+    try:
+        import jax  # noqa: PLC0415
+
+        # Force 64-bit precision (required by keypoint-moseq)
+        jax.config.update("jax_enable_x64", True)
+
+        # Optionally force a specific backend (useful on HPC)
+        if getattr(args, "jax_platform", "auto") != "auto":
+            jax.config.update("jax_platform_name", args.jax_platform)
+    except Exception as exc:
+        raise RuntimeError(
+            "Failed to import/configure JAX. Ensure keypoint-moseq (and jax/jaxlib) are installed. "
+            "For GPU nodes, install a CUDA-enabled jaxlib (e.g. via keypoint-moseq[gpu])."
+        ) from exc
+
     project_path = Path(args.project_path).resolve()
     use_filtered: bool = args.use_filtered
     steps: list[str] = args.steps
@@ -462,7 +653,15 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Set up logging
     # ------------------------------------------------------------------
-    logger = _setup_logging(log_path)
+    logger = setup_logging(log_path)
+    try:
+        import jax  # noqa: PLC0415
+
+        logger.info("JAX backend  : %s", jax.default_backend())
+        logger.info("JAX devices  : %s", ", ".join(str(d) for d in jax.devices()))
+    except Exception:
+        # Avoid failing just because device reporting failed.
+        pass
     logger.info("=" * 60)
     logger.info("Project     : %s", project_path)
     logger.info("Pose data   : %s", pose_data_dir)
@@ -501,9 +700,34 @@ def main() -> None:
     config = load_yaml_config(config_path)
 
     # ------------------------------------------------------------------
+    # Optional: launch interactive noise calibration (Jupyter widget)
+    # ------------------------------------------------------------------
+    if getattr(args, "launch_noise_calibration", False):
+        _launch_noise_calibration_notebook(
+            project_path=project_path,
+            config_path=config_path,
+            use_filtered=use_filtered,
+            logger=logger,
+        )
+        logger.info("Exiting after launching noise calibration.")
+        sys.exit(0)
+
+    # ------------------------------------------------------------------
     # Create output directories
     # ------------------------------------------------------------------
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Dry-run: validate configuration and paths without running heavy work
+    # ------------------------------------------------------------------
+    if getattr(args, "dry_run", False):
+        logger.info("Dry-run enabled: validation complete. No steps will be executed.")
+        logger.info("Requested steps: %s", steps)
+        logger.info("KPMS project dir: %s", kpms_project_dir)
+        logger.info("Pose data dir: %s", pose_data_dir)
+        logger.info("Results dir: %s", results_dir)
+        logger.info("Exiting due to --dry-run.")
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Run pipeline steps
@@ -522,34 +746,43 @@ def main() -> None:
 
     if "fit" in steps:
         if data is None or kpms_config is None:
-            # Reload from disk when skipping prepare
-            import keypoint_moseq as kpms  # noqa: PLC0415
-            kpms_config = kpms.load_config(str(kpms_project_dir))
-            pca = kpms.load_pca(str(kpms_project_dir))
-            logger.warning(
-                "Step 'prepare' was skipped; loading PCA from disk. "
-                "Make sure pose data was formatted in a previous run."
-            )
-            # TODO: data and metadata are not persisted between runs in this
-            #       minimal implementation.  If you skip 'prepare', ensure you
-            #       have a checkpoint to resume from and use apply_model
-            #       instead of fit_model.
-            logger.error(
-                "Cannot run 'fit' without 'prepare' in this run "
-                "(data/metadata not available).  Add 'prepare' to --steps."
-            )
-            sys.exit(1)
+            if getattr(args, "resume_model_name", None):
+                model, model_name = step_resume_fit(
+                    kpms_project_dir=kpms_project_dir,
+                    config=config,
+                    resume_model_name=args.resume_model_name,
+                    resume_iteration=args.resume_iteration,
+                    continue_iters=args.continue_iters,
+                    resume_ar_only=args.resume_ar_only,
+                    kappa=args.kappa,
+                    logger=logger,
+                )
+            else:
+                # Reload from disk when skipping prepare
+                import keypoint_moseq as kpms  # noqa: PLC0415
+                kpms_config = kpms.load_config(str(kpms_project_dir))
+                pca = kpms.load_pca(str(kpms_project_dir))
+                logger.warning(
+                    "Step 'prepare' was skipped; loading PCA from disk. "
+                    "Make sure pose data was formatted in a previous run."
+                )
+                logger.error(
+                    "Cannot run 'fit' without 'prepare' in this run (data/metadata not available). "
+                    "Either add 'prepare' to --steps, or use --resume-model-name to resume from a checkpoint."
+                )
+                sys.exit(1)
 
-        model, model_name = step_fit(
-            data=data,
-            metadata=metadata,
-            pca=pca,
-            kpms_project_dir=kpms_project_dir,
-            kpms_config=kpms_config,
-            config=config,
-            model_name=model_name,
-            logger=logger,
-        )
+        if model is None or model_name is None:
+            model, model_name = step_fit(
+                data=data,
+                metadata=metadata,
+                pca=pca,
+                kpms_project_dir=kpms_project_dir,
+                kpms_config=kpms_config,
+                config=config,
+                model_name=model_name,
+                logger=logger,
+            )
 
     if "export" in steps:
         if model is None or model_name is None:

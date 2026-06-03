@@ -30,7 +30,7 @@ Load results from an explicit HDF5 path:
         --project-path /path/to/project \\
         --results-h5 results/my_project/kpms_project/my_model/results.h5
 
-TODO notes
+# TODO notes
 ----------
 * ``kpms.load_results`` expects the path
   ``<kpms_project_dir>/<model_name>/results.h5``.  If model discovery fails,
@@ -50,9 +50,8 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # Allow running from any working directory
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
+from kpms_utils import ensure_repo_in_path
+ensure_repo_in_path()
 
 from kpms_utils.path_utils import (
     get_project_name,
@@ -60,22 +59,7 @@ from kpms_utils.path_utils import (
     get_kpms_project_dir,
     get_log_path,
 )
-
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-def _setup_logging(log_path: Path) -> logging.Logger:
-    """Configure a logger writing to stdout and a file."""
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    fmt = "%(asctime)s [%(levelname)s] %(message)s"
-    handlers: list[logging.Handler] = [
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(log_path),
-    ]
-    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
-    return logging.getLogger(__name__)
+from kpms_utils.logging_utils import setup_logging
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +107,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "Output directory for the syllable CSVs.  Defaults to "
             "``results/<project_name>/syllable_timeseries/``."
         ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("List discovered results files and exit without writing CSVs."),
     )
     return parser
 
@@ -253,7 +243,7 @@ def main() -> None:
     results_dir = get_results_dir(project_path)
     log_path = get_log_path(project_path)
 
-    logger = _setup_logging(log_path)
+    logger = setup_logging(log_path)
     logger.info("Project path : %s", project_path)
     logger.info("KPMS dir    : %s", kpms_project_dir)
 
@@ -280,6 +270,13 @@ def main() -> None:
         sys.exit(1)
 
     logger.info("Found %d results file(s).", len(h5_paths))
+
+    # If dry-run, list discovered files and exit without writing CSVs
+    if getattr(args, "dry_run", False):
+        for p in h5_paths:
+            logger.info("[dry-run] would process: %s", p)
+        logger.info("Dry-run complete: no files were written.")
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Export each results file

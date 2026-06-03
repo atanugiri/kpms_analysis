@@ -4,64 +4,38 @@
 
 # used to access columns in the keypoint data
 bodyparts:
-- nose
-- left_ear
-- right_ear
-- neck
-- left_forepaw
-- right_forepaw
-- mid_back
-- left_hindpaw
-- right_hindpaw
-- tail_base
-- tail_mid
-- tail_tip
+- Head
+- Neck
+- Midback
+- Lowerback
+- Tailbase
 
 # determines the subset of bodyparts to use for modeling and the order in which they are represented
 use_bodyparts:
-- nose
-- left_ear
-- right_ear
-- neck
-- left_forepaw
-- right_forepaw
-- mid_back
-- left_hindpaw
-- right_hindpaw
-- tail_base
+- Head
+- Neck
+- Midback
+- Lowerback
+- Tailbase
 
 # used for visualization only
 skeleton:
-- - nose
-  - neck
-- - neck
-  - left_ear
-- - neck
-  - right_ear
-- - neck
-  - left_forepaw
-- - neck
-  - right_forepaw
-- - neck
-  - mid_back
-- - mid_back
-  - left_hindpaw
-- - mid_back
-  - right_hindpaw
-- - mid_back
-  - tail_base
-- - tail_base
-  - tail_mid
-- - tail_mid
-  - tail_tip
+- - Head
+  - Neck
+- - Neck
+  - Midback
+- - Midback
+  - Lowerback
+- - Lowerback
+  - Tailbase
 
 # used to initialize heading
 anterior_bodyparts:
-- BODYPART1
+- Head
 
 # used to initialize heading
 posterior_bodyparts:
-- BODYPART3
+- Tailbase
 
 
 #==================== FITTING =====================#
@@ -94,14 +68,14 @@ obs_hypparams:
 ar_hypparams:
   K_0_scale: 10.0
   S_0_scale: 0.01
-  latent_dim: 10
+  latent_dim: 8
   nlags: 3
 
 # transition hyperparameters
 trans_hypparams:
   alpha: 5.7
   gamma: 1000.0
-  kappa: 1000000.0
+  kappa: 100000.0
   num_states: 100
 
 # centroid movement hyperparameters
@@ -133,5 +107,5 @@ whiten: true
 fix_heading: false
 
 # frames per second of the video recordings
-fps: 30
+fps: 15
 outlier_scale_factor: 6.0
