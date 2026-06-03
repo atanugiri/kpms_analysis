@@ -161,7 +161,7 @@ def main() -> None:
 
         if hasattr(kpms, "plot_pcs"):
             try:
-                kpms.plot_pcs(pca, project_dir=str(kpms_project_dir))
+                kpms.plot_pcs(pca, project_dir=str(kpms_project_dir), **kpms_config)
             except Exception as exc:  # pragma: no cover - plotting optional
                 logger.warning("plot_pcs failed: %s", exc)
         else:

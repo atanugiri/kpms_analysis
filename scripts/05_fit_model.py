@@ -103,9 +103,15 @@ def main() -> None:
     logger.info("Initialising model (num_states=%s).", kpms_config.get("num_states"))
     model = kpms.init_model(data, pca=pca, **kpms_config)
 
-    num_iters = config.get("num_iters", 200)
-    ar_iters = config.get("ar_iters", 50)
-    save_every = config.get("save_every_n_iters", 25)
+    # Prefer values from the KPMS project config if present; otherwise fall back
+    # to the CLI/config file or hardcoded defaults.
+    num_iters = kpms_config.get("num_iters", config.get("num_iters", 200))
+    ar_iters = kpms_config.get("ar_iters", config.get("ar_iters", 50))
+    save_every = kpms_config.get("save_every_n_iters", config.get("save_every_n_iters", 25))
+
+    logger.info("Using num_iters=%s (project config preferred if present)", num_iters)
+    logger.info("Using ar_iters=%s (project config preferred if present)", ar_iters)
+    logger.info("Using save_every_n_iters=%s (project config preferred if present)", save_every)
 
     model_name = args.model_name
 
