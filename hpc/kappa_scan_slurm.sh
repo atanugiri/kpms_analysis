@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-REPO_DIR="$WORK/kpms_analysis_2"
+REPO_DIR="$WORK/kpms_analysis"
 CONDA_ENV_NAME=keypoint_moseq
 
 # Scan parameters exported for scripts/kappa_scan.py.
